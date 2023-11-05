@@ -17,14 +17,14 @@ def dbWriteTag(measurement, tag, tagvalue, field, value):
         .tag(tag, tagvalue)
         .field(field, value)
     )
-    write_api.write(bucket=bucket, org="home", record=point)
+    write_api.write(bucket=bucket, org=org, record=point)
 
 def dbWrite(measurement, field, value):
     point = (
         Point(measurement)
         .field(field, value)
     )
-    write_api.write(bucket=bucket, org="home", record=point)
+    write_api.write(bucket=bucket, org=org, record=point)
 
 
 def df(args):
