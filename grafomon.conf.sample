@@ -1,0 +1,14 @@
+[DB]
+TOKEN = *****************************************
+URL = http://127.0.0.1:8086
+ORG = home
+BUCKET = grafomon
+
+[DRIVES]
+MOUNTPOINTS = /, /mnt/hdd
+
+[NET]
+IFACES = eno1, eno2
+
+[SMART]
+DEVICES = /dev/sda, /dev/sdb, /dev/sdc
