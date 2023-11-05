@@ -63,6 +63,14 @@ def loadavg():
     dbWrite("loadavg", "min5", float(k[1]))
     dbWrite("loadavg", "min15", float(k[2]))
 
+def entropy():
+    f = open("/proc/sys/kernel/random/entropy_avail", "r")
+    v = f.readline()
+    f.close()
+    v = int(v.strip())
+    dbWrite("common", "entropy", v)
+
+
 def smart(*args):
     for dev in args:
         cmd = ['smartctl', '-a']
@@ -184,6 +192,21 @@ def meminfo():
             v = int(z[item].split()[0]) * 1024
             dbWrite("mem", item, v)
 
+
+def cpufreq():
+    f = open("/proc/cpuinfo", "r")
+    z = []
+    for line in f:
+        if "cpu MHz" in line:
+            line = line.strip()
+            v = line.split(":")
+            v = float(v[1].strip())
+            z.append(v)
+    f.close()
+    for i in range(len(z)):
+        dbWrite("cpufreq", f"core{i}", z[i])
+
+
 def net(args):
     result = subprocess.run(['cat', '/proc/net/dev'], stdout=subprocess.PIPE, encoding='utf-8')
     k = result.stdout.split('\n')
@@ -234,9 +257,11 @@ if __name__ == '__main__':
         drives[i] = drives[i].strip()
     df(drives)
 
+    entropy()
     cputemp()
     apc()
     meminfo()
+    cpufreq()
 
     ifaces = config.get("NET", "IFACES")
     ifaces = ifaces.split(",")
