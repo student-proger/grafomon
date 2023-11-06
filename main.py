@@ -259,9 +259,6 @@ def kernelUsage():
             i1.append(int(v[4]))
     f.close()
 
-    print(u0)
-    print(u1)
-
     for i in range(len(cpulist)):
         ud = u1[i] - u0[i]
         nd = n1[i] - n0[i]
@@ -274,7 +271,8 @@ def kernelUsage():
             avg_load = round(avg_load, 3)
         else:
             avg_load = 0
-        print(cpulist[i], avg_load)
+
+        dbWrite("kernelusage", cpulist[i], avg_load)
 
 
 def net(args):
