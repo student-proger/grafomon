@@ -77,6 +77,49 @@ def entropy():
     v = int(v.strip())
     dbWrite("common", "entropy", v)
 
+def procCount():
+    cmd = ['ps', '-e']
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8')
+    k = len(result.stdout.split("\n"))
+    dbWrite("common", "processes", k)
+
+def hplog():
+    legenda = {
+        1: "Inlet Ambient",
+        2: "CPU",
+        3: "Memory",
+        4: "HD Max",
+        5: "Chipset",
+        6: "Chipset Zone",
+        7: "VR P1 Zone",
+        8: "Supercap Max",
+        9: "iLO Zone",
+        10: "PCI 1",
+        11: "PCI 1 Zone",
+        12: "Sys Exhaust",
+        13: "LOM"
+    }
+    cmd = ['hplog', '-t']
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8')
+    k = result.stdout.split("\n")
+    z = {}
+    row = -1
+    for line in k:
+        row += 1
+        if row == 0:
+            continue
+        line = line.strip()
+        if line != "":
+            index = int(line.split()[0])
+            line = line[-25:]
+            p = line.find("/")
+            v = line[p+1:p+4].strip()
+            if v != "---":
+                z[index] = int(v)
+
+    for item in z:
+        dbWrite("hpe", legenda[item], z[item])
+
 
 def smart(drv):
     cmd = ['smartctl', '-a', drv]
@@ -271,6 +314,7 @@ if __name__ == '__main__':
 
     uptime()
     loadavg()
+    procCount()
 
     drives = config.get("DRIVES", "MOUNTPOINTS")
     drives = drives.split(",")
@@ -283,6 +327,7 @@ if __name__ == '__main__':
     apc()
     meminfo()
     cpufreq()
+    hplog()
 
     ifaces = config.get("NET", "IFACES")
     ifaces = ifaces.split(",")
