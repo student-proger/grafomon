@@ -51,15 +51,21 @@ def df(args):
         print("Error: df")
 
 def uptime():
-    result = subprocess.run(['cat', '/proc/uptime'], stdout=subprocess.PIPE, encoding='utf-8')
-    k = result.stdout.strip().split()
+    f = open("/proc/uptime", "r")
+    k = f.readline()
+    f.close()
+
+    k = k.strip().split()
     dbWrite("uptime", "uptime", int(k[0].split('.')[0]))
     dbWrite("uptime", "idle", int(k[1].split('.')[0]))
     dbWrite("uptime", "days", float(k[0].split('.')[0]) / (24 * 3600))
 
 def loadavg():
-    result = subprocess.run(['cat', '/proc/loadavg'], stdout=subprocess.PIPE, encoding='utf-8')
-    k = result.stdout.strip().split()
+    f = open("/proc/loadavg", "r")
+    k = f.readline()
+    f.close()
+
+    k = k.strip().split()
     dbWrite("loadavg", "min1", float(k[0]))
     dbWrite("loadavg", "min5", float(k[1]))
     dbWrite("loadavg", "min15", float(k[2]))
@@ -184,10 +190,9 @@ def apc():
     #print(z)
 
 def meminfo():
-    result = subprocess.run(['cat', '/proc/meminfo'], stdout=subprocess.PIPE, encoding='utf-8')
-    k = result.stdout.split('\n')
+    f = open("/proc/meminfo", "r")
     z = {}
-    for line in k:
+    for line in f:
         if ":" in line:
             item = line.split(":")
             item[0] = item[0].strip()
@@ -195,6 +200,9 @@ def meminfo():
             if 'kB' in item[1]:
                 item[1] = item[1].split()[0]
             z[item[0]] = item[1]
+    f.close()
+
+
     #print(z)
     values = ["MemTotal", "MemFree", "MemAvailable", "Buffers", "Cached", "SwapTotal", "SwapFree"]
     for item in values:
@@ -221,10 +229,8 @@ def cpufreq():
 
 
 def net(args):
-    result = subprocess.run(['cat', '/proc/net/dev'], stdout=subprocess.PIPE, encoding='utf-8')
-    k = result.stdout.split('\n')
-
-    for line in k:
+    f = open("/proc/net/dev", "r")
+    for line in f:
         line = line.strip()
         while '  ' in line:
             line = line.replace('  ', ' ')
@@ -236,6 +242,7 @@ def net(args):
             if item[0] in args:
                 dbWriteTag("net", "device", item[0], "rx", int(item[1]))
                 dbWriteTag("net", "device", item[0], "tx", int(item[8]))
+    f.close()
 
 
 if __name__ == '__main__':
