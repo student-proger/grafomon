@@ -2,11 +2,12 @@
 
 import sys
 import os
+import time
 import subprocess
 from datetime import datetime
 from configparser import ConfigParser
 
-import influxdb_client, os, time
+import influxdb_client
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
@@ -71,50 +72,59 @@ def entropy():
     dbWrite("common", "entropy", v)
 
 
-def smart(*args):
-    for dev in args:
-        cmd = ['smartctl', '-a']
-        cmd.append(dev)
+def smart(drv):
+    cmd = ['smartctl', '-a', drv]
 
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8')
-        k = result.stdout.split('\n')
-        rec = False
-        for line in k:
-            item = line.split()
-            if 'Device Model:' in line:
-                model = item[-1]
-            if 'Serial Number:' in line:
-                sn = item[-1]
-            if 'ID#' in line:
-                rec = True
-                continue
-            if len(item) == 0:
-                rec = False
-            if rec:
-                #print(item)
-                if len(item) > 0:
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8')
+    k = result.stdout.split('\n')
+    rec = False
+    for line in k:
+        item = line.split()
+        if 'Device Model:' in line:
+            model = item[-1]
+        if 'Serial Number:' in line:
+            sn = item[-1]
+        if 'ID#' in line:
+            rec = True
+            continue
+        if len(item) == 0:
+            rec = False
+        if rec:
+            #print(item)
+            if len(item) > 0:
+                c = item[-1]
+                if '/' in c:
+                    c = item[-3]
+                point = (
+                    Point("smart")
+                    .tag("model", model + " " + sn)
+                    .tag("device", drv)
+                    .field(item[1], int(c))
+                )
+                write_api.write(bucket=bucket, org=org, record=point)
+
+                if 'Temperature' in line:
                     c = item[-1]
                     if '/' in c:
                         c = item[-3]
                     point = (
-                        Point("smart")
+                        Point("hddtemp")
                         .tag("model", model + " " + sn)
-                        .tag("device", dev)
-                        .field(item[1], int(c))
+                        .tag("device", drv)
+                        .field("temp", int(c))
                     )
-                    write_api.write(bucket=bucket, org="home", record=point)
+                    write_api.write(bucket=bucket, org=org, record=point)
 
-                    if 'Temperature' in line:
-                        c = item[-1]
-                        if '/' in c:
-                            c = item[-3]
-                        point = (
-                            Point("hddtemp")
-                            .tag("model", model + " " + sn)
-                            .tag("device", dev)
-                            .field("temp", int(c))
-                        )
-                        write_api.write(bucket=bucket, org="home", record=point)
+                if 'Total_LBAs_Written' in line:
+                    c = 512 * int(item[-1])
+                    point = (
+                        Point("ssd")
+                        .tag("model", model + " " + sn)
+                        .tag("device", drv)
+                        .field("tbw", c)
+                    )
+                    write_api.write(bucket=bucket, org=org, record=point)
+
 
 def cputemp():
     result = subprocess.run(['sensors'], stdout=subprocess.PIPE, encoding='utf-8')
@@ -207,6 +217,66 @@ def cpufreq():
         dbWrite("cpufreq", f"core{i}", z[i])
 
 
+def kernelUsage():
+    cpulist = []
+    u0 = []
+    n0 = []
+    s0 = []
+    i0 = []
+    u1 = []
+    n1 = []
+    s1 = []
+    i1 = []
+
+    f = open("/proc/stat", "r")
+    for line in f:
+        if "cpu" in line:
+            line = line.strip()
+            while "  " in line:
+                line = line.replace("  ", " ")
+            v = line.split()
+
+            cpulist.append(v[0])
+            u0.append(int(v[1]))
+            n0.append(int(v[2]))
+            s0.append(int(v[3]))
+            i0.append(int(v[4]))
+    f.close()
+
+    time.sleep(5)
+
+    f = open("/proc/stat", "r")
+    for line in f:
+        if "cpu" in line:
+            line = line.strip()
+            while "  " in line:
+                line = line.replace("  ", " ")
+            v = line.split()
+
+            u1.append(int(v[1]))
+            n1.append(int(v[2]))
+            s1.append(int(v[3]))
+            i1.append(int(v[4]))
+    f.close()
+
+    print(u0)
+    print(u1)
+
+    for i in range(len(cpulist)):
+        ud = u1[i] - u0[i]
+        nd = n1[i] - n0[i]
+        sd = s1[i] - s0[i]
+        id = i1[i] - i0[i]
+
+        total = ud + nd + sd + id
+        if total != 0:
+            avg_load = 100 * (ud + nd + sd) / total
+            avg_load = round(avg_load, 3)
+        else:
+            avg_load = 0
+        print(cpulist[i], avg_load)
+
+
 def net(args):
     result = subprocess.run(['cat', '/proc/net/dev'], stdout=subprocess.PIPE, encoding='utf-8')
     k = result.stdout.split('\n')
@@ -250,6 +320,7 @@ if __name__ == '__main__':
 
     uptime()
     loadavg()
+    kernelUsage()
 
     drives = config.get("DRIVES", "MOUNTPOINTS")
     drives = drives.split(",")
@@ -272,7 +343,7 @@ if __name__ == '__main__':
     #if len(sys.argv) > 1:
     now = datetime.now()
     time_m = int(now.strftime("%M"))
-    if (time_m >= 58) or (time_m <= 2):
+    if (time_m >= 59) or (time_m <= 2):
         drv = config.get("SMART", "DEVICES")
         drv = drv.split(",")
         for i in range(len(drv)):
