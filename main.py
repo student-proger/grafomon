@@ -217,62 +217,7 @@ def cpufreq():
         dbWrite("cpufreq", f"core{i}", z[i])
 
 
-def kernelUsage():
-    cpulist = []
-    u0 = []
-    n0 = []
-    s0 = []
-    i0 = []
-    u1 = []
-    n1 = []
-    s1 = []
-    i1 = []
 
-    f = open("/proc/stat", "r")
-    for line in f:
-        if "cpu" in line:
-            line = line.strip()
-            while "  " in line:
-                line = line.replace("  ", " ")
-            v = line.split()
-
-            cpulist.append(v[0])
-            u0.append(int(v[1]))
-            n0.append(int(v[2]))
-            s0.append(int(v[3]))
-            i0.append(int(v[4]))
-    f.close()
-
-    time.sleep(5)
-
-    f = open("/proc/stat", "r")
-    for line in f:
-        if "cpu" in line:
-            line = line.strip()
-            while "  " in line:
-                line = line.replace("  ", " ")
-            v = line.split()
-
-            u1.append(int(v[1]))
-            n1.append(int(v[2]))
-            s1.append(int(v[3]))
-            i1.append(int(v[4]))
-    f.close()
-
-    for i in range(len(cpulist)):
-        ud = u1[i] - u0[i]
-        nd = n1[i] - n0[i]
-        sd = s1[i] - s0[i]
-        id = i1[i] - i0[i]
-
-        total = ud + nd + sd + id
-        if total != 0:
-            avg_load = 100 * (ud + nd + sd) / total
-            avg_load = round(avg_load, 3)
-        else:
-            avg_load = 0
-
-        dbWrite("kernelusage", cpulist[i], avg_load)
 
 
 def net(args):
@@ -312,13 +257,13 @@ if __name__ == '__main__':
     token = config.get("DB", "TOKEN")
     org = config.get("DB", "ORG")
     bucket = config.get("DB", "BUCKET")
+    interval = config.getint("COMMON", "INTERVAL")
 
     write_client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
     write_api = write_client.write_api(write_options=SYNCHRONOUS)
 
     uptime()
     loadavg()
-    kernelUsage()
 
     drives = config.get("DRIVES", "MOUNTPOINTS")
     drives = drives.split(",")
@@ -348,3 +293,61 @@ if __name__ == '__main__':
             drv[i] = drv[i].strip()
         for w in drv:
             smart(w)
+
+    # kernelUsage
+
+    cpulist = []
+    u0 = []
+    n0 = []
+    s0 = []
+    i0 = []
+    u1 = []
+    n1 = []
+    s1 = []
+    i1 = []
+
+    f = open("/proc/stat", "r")
+    for line in f:
+        if "cpu" in line:
+            line = line.strip()
+            while "  " in line:
+                line = line.replace("  ", " ")
+            v = line.split()
+
+            cpulist.append(v[0])
+            u0.append(int(v[1]))
+            n0.append(int(v[2]))
+            s0.append(int(v[3]))
+            i0.append(int(v[4]))
+    f.close()
+
+    time.sleep(interval)
+
+    f = open("/proc/stat", "r")
+    for line in f:
+        if "cpu" in line:
+            line = line.strip()
+            while "  " in line:
+                line = line.replace("  ", " ")
+            v = line.split()
+
+            u1.append(int(v[1]))
+            n1.append(int(v[2]))
+            s1.append(int(v[3]))
+            i1.append(int(v[4]))
+    f.close()
+
+    for i in range(len(cpulist)):
+        ud = u1[i] - u0[i]
+        nd = n1[i] - n0[i]
+        sd = s1[i] - s0[i]
+        id = i1[i] - i0[i]
+
+        total = ud + nd + sd + id
+        if total != 0:
+            avg_load = 100 * (ud + nd + sd) / total
+            avg_load = round(avg_load, 3)
+        else:
+            avg_load = 0
+
+        dbWrite("kernelusage", cpulist[i], avg_load)
